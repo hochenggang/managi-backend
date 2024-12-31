@@ -169,7 +169,7 @@ class SSHConnection:
             self.ssh.connect(self.ip, port=self.port, username=self.ssh_username, password=self.auth_value, timeout=5)
         elif self.auth_type == "key":
             # 使用密钥认证
-            key = paramiko.RSAKey.from_private_key_file(io.StringIO(self.auth_value))
+            key = paramiko.RSAKey.from_private_key(io.StringIO(self.auth_value))
             self.ssh.connect(self.ip, port=self.port, username=self.ssh_username, pkey=key, timeout=5)
         else:
             raise ValueError(f"Unsupported auth_type: {self.auth_type}")
