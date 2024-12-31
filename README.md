@@ -1,3 +1,4 @@
+
 # managi-backend
 
 一个基于 FastAPI 的 SSH 管理工具，提供用户认证、SSH 连接测试、命令执行等功能，适合用于远程服务器管理。
@@ -33,6 +34,16 @@ python main.py
 python main.py -p 8000
 ```
 
+### 使用 Docker 镜像
+
+你可以通过 Docker 镜像快速试用：
+
+```bash
+docker run -d -p 18001:18001 hochenggang/managi:0.1.0
+```
+
+部署完成后，将形如 `http://192.168.1.1:18001` 的后端地址填入前端即可开始使用。前端可以直接访问：[managi-frontend](https://hochenggang.github.io/managi-frontend/)。
+
 ### 接口文档
 
 启动应用后，访问以下地址查看接口文档：
@@ -40,115 +51,6 @@ python main.py -p 8000
 - **Swagger UI**: `http://127.0.0.1:18001/docs`
 - **ReDoc**: `http://127.0.0.1:18001/redoc`
 
-## API 接口
-
-### 1. 初始化管理员
-
-- **URL**: `/api/admin/init`
-- **Method**: `POST`
-- **Request Body**:
-  ```json
-  {
-    "username": "admin",
-    "password": "admin123"
-  }
-  ```
-- **Response**:
-  - 成功：`200 OK`
-  - 管理员已存在：`403 Forbidden`
-
-### 2. 用户登录
-
-- **URL**: `/api/login`
-- **Method**: `POST`
-- **Request Body**:
-  ```json
-  {
-    "username": "admin",
-    "password": "admin123"
-  }
-  ```
-- **Response**:
-  - 成功：
-    ```json
-    {
-      "access_token": "your_token",
-      "token_type": "bearer"
-    }
-    ```
-  - 失败：`401 Unauthorized`
-
-### 3. 获取 Token 信息
-
-- **URL**: `/api/token/info`
-- **Method**: `GET`
-- **Headers**:
-  - `Authorization: Bearer your_token`
-- **Response**:
-  ```json
-  {
-    "username": "admin",
-    "create_at": "1672502400",
-    "expire_at": "1672506000"
-  }
-  ```
-
-### 4. 测试 SSH 连接
-
-- **URL**: `/api/ssh/test`
-- **Method**: `POST`
-- **Headers**:
-  - `Authorization: Bearer your_token`
-- **Request Body**:
-  ```json
-  {
-    "name": "test-server",
-    "ip": "192.168.1.1",
-    "port": 22,
-    "ssh_username": "root",
-    "auth_type": "password",
-    "auth_value": "your_password",
-    "cmds": ["ls", "pwd"]
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "time_elapsed": 0.52,
-    "success": true,
-    "output": ["file1\n", "file2\n"],
-    "error": [],
-    "node": {
-      "name": "test-server",
-      "ip": "192.168.1.1",
-      "ssh_username": "root",
-      "port": 22,
-      "auth_type": "password",
-      "auth_value": "***"
-    },
-    "cmds": "ls\npwd"
-  }
-  ```
-
-### 5. 测试接口
-
-- **URL**: `/api/ping`
-- **Method**: `GET`
-- **Response**:
-  ```json
-  {
-    "pong": 1
-  }
-  ```
-
-## 项目结构
-
-```
-.
-├── main.py              # 主程序入口
-├── README.md            # 项目说明文档
-├── management.db        # SQLite 数据库文件，自动生成
-```
 
 ## 贡献指南
 
