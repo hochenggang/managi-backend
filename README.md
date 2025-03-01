@@ -16,7 +16,7 @@
 你可以通过 Docker 镜像一行命令快速使用：
 
 ```bash
-docker run -d -p 18001:18001 hochenggang/managi:0.2.0
+docker run -d --network host hochenggang/managi:0.2.0
 ```
 
 部署完成后，访问 `http://IP:18001` 即可开始使用。你也可以进一步进行反向代理，配置域名等[DEMO](https://managi.imhcg.cn/)。
