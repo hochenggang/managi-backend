@@ -176,7 +176,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
         # 认证方式：密钥或密码
         if private_key:
-            private_key_obj = paramiko.RSAKey.from_private_key_file(private_key)
+            private_key_obj = paramiko.RSAKey.from_private_key(io.StringIO(private_key))
             ssh.connect(host, port=port, username=username, pkey=private_key_obj)
         else:
             ssh.connect(host, port=port, username=username, password=password)
@@ -202,7 +202,10 @@ async def websocket_endpoint(websocket: WebSocket):
         await asyncio.gather(forward_output(), forward_input())
 
     except Exception as e:
-        await websocket.send_text(f"SSH Error: {str(e)}")
+        try:
+            await websocket.send_text(f"SSH Error: {str(e)}")
+        except Exception:
+            pass
     finally:
         if not websocket.client_state == WebSocketState.DISCONNECTED:
             await websocket.close()
