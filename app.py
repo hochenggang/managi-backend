@@ -135,18 +135,6 @@ def test_ssh_connection(node: Node, cmds: List[str]) -> CmdsTestResult:
     }
 
 
-@app.get("/api/ping")
-def get_ping():
-    """
-    测试接口是否正常
-    返回初始化状态
-    """
-    global cache_admin_user_count
-    cache_api_ping = {}
-    cache_api_ping["pong"] = cache_admin_user_count
-    return cache_api_ping
-
-
 @app.get("/")
 async def get():
     with open("index.html", "r", encoding="utf-8") as f:
@@ -157,7 +145,7 @@ async def get():
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-
+    ssh = None
     try:
         # 接收连接信息
         connection_info = await websocket.receive_text()
@@ -189,14 +177,21 @@ async def websocket_endpoint(websocket: WebSocket):
         async def forward_output():
             while True:
                 if channel.recv_ready():
-                    data = channel.recv(1024).decode("utf-8")
-                    await websocket.send_text(data)
+                    try:
+                        data = channel.recv(1024).decode("utf-8",errors="ignore")
+                        await websocket.send_text(data)
+                    except Exception as e:
+                        await websocket.send_text(str(e))
+                        
                 await asyncio.sleep(0.1)
 
         async def forward_input():
             while True:
-                data = await websocket.receive_text()
-                channel.send(data.encode("utf-8"))
+                try:
+                    data = await websocket.receive_text()
+                    channel.send(data.encode("utf-8"))
+                except Exception as e:
+                    await websocket.send_text(str(e))
 
         # 运行任务
         await asyncio.gather(forward_output(), forward_input())
@@ -209,7 +204,8 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         if not websocket.client_state == WebSocketState.DISCONNECTED:
             await websocket.close()
-        ssh.close()
+        if ssh:
+            ssh.close()
 
 
 # OPTION /*
@@ -228,7 +224,7 @@ async def add_cors_headers(request: Request, call_next):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
     response.headers["Access-Control-Allow-Methods"] = "GET,PUT,POST,DELETE,OPTIONS"
-    response.headers["X-VERSION"] = "20241230"
+    response.headers["X-VERSION"] = "20250313"
     return response
 
 
