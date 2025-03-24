@@ -20,15 +20,15 @@ from pydantic import BaseModel
 import paramiko
 
 
-# 获取静态文件路径
-def get_resource_path(relative_path):
-    if hasattr(sys, "_MEIPASS"):
-        # Nuitka 打包后的路径
-        return os.path.join(sys._MEIPASS, relative_path)
-    return relative_path
 
 
-sys.stdout = open(get_resource_path("log.txt"), "w")
+def get_resource_path(filename):
+    # 获取静态文件路径
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, filename)
 
 
 # FastAPI 应用

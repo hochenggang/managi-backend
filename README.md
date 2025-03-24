@@ -1,10 +1,12 @@
 
 ##  Managi < 管理你的机
 
-![](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/xterm.jpg)
+[直接预览 Demo](https://managi.imhcg.cn/#/)
 
 一个网页版 SSH 管理工具，由Python提供 websocket 到 ssh 协议的中继。
 便捷的进行 SSH 连接、批量命令执行等功能，最小化设计，及其轻量。
+
+![](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/xterm.jpg)
 
 
 ## 功能特性
