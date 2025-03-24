@@ -1,86 +1,112 @@
+# Managi < 管理你的机
 
-##  Managi < 管理你的机
+[直接预览 Demo](https://managi.imhcg.cn/)
 
-[直接预览 Demo](https://managi.imhcg.cn/#/)
+Managi 是一款轻量级的网页版 SSH 管理工具，基于 Python 提供 WebSocket 到 SSH 协议的中继服务。通过简洁直观的界面，用户可以轻松管理多个服务器，执行批量命令操作，实现高效的运维体验。
 
-一个网页版 SSH 管理工具，由Python提供 websocket 到 ssh 协议的中继。
-便捷的进行 SSH 连接、批量命令执行等功能，最小化设计，及其轻量。
-
-![](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/xterm.jpg)
+![预览图](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/xterm.jpg)
 
 
 ## 功能特性
 
-- **WEB SSH**：在一个网页上管理多个服务器，数据全部保持在本地。支持通过密码或密钥进行 SSH 连接。
-- **批量执行命令**：可以一键向多个服务器执行命令，改密码、更新系统软件包，一键即可。
+- **WEB SSH 终端**：在浏览器中直接管理多台服务器，所有数据均保存在本地。支持通过密码或密钥进行 SSH 连接。
+- **批量命令执行**：一键向多台服务器发送命令，例如修改密码、更新系统软件包等，大幅提升运维效率。
+- **极简设计**：界面清爽、功能专注，资源占用极低，适合各种规模的团队和个人使用。
 
 
-## 快速开始使用
+## 快速开始
 
-### 1 部署到你的服务器
-#### 1.1 使用 Docker 镜像
+### 1. 部署到服务器
 
-你可以通过 Docker 镜像一行命令快速使用：
+#### 1.1 使用 Docker 镜像（推荐）
+
+通过 Docker 镜像快速部署 Managi：
 
 ```bash
 docker run -d --network host hochenggang/managi:0.3.0
 ```
 
-或自行拉取源码构建镜像
-```
+如果需要从源码构建镜像，可以执行以下步骤：
+
+```bash
 git clone https://github.com/hochenggang/managi-backend.git
-
+cd managi-backend
 docker build -t managi:0.3.0 .
-
 docker run -d --network host managi:0.3.0
-
 ```
 
-部署完成后，访问 `http://IP:18001` 即可开始使用。你也可以进一步进行反向代理，配置域名等。
-
+部署完成后，访问 `http://IP:18001` 即可开始使用。您还可以配置反向代理和域名以满足实际需求。
 
 ---
 
 #### 1.2 手动部署源代码
 
-确保已安装 Python 3.9+，然后运行以下命令安装依赖：
+确保已安装 Python 3.9+，然后运行以下命令安装依赖并启动服务：
 
 ```bash
 pip install -r requirements.txt
 python app.py
 ```
 
-默认端口为 `18001`，可以通过 `-p` 参数指定端口：
+默认端口为 `18001`，可以通过 `-p` 参数指定其他端口：
 
 ```bash
 python app.py -p 8000
 ```
-最好是使用进程守护软件来执行。
 
+建议使用进程守护工具（如 `systemd` 或 `supervisord`）来管理服务。
+
+---
 
 #### 1.3 Windows 本地使用
-##### 1.3.1 手动打包为 exe 本地使用
-在 windows 环境下安装前文提及的 python 环境，再执行以下步骤
-```
-额外安装依赖
-pip install fastapi uvicorn nuitka pystray pillow
 
-打包为 exe
-nuitka --standalone --onefile --windows-console-mode=disable --windows-icon-from-ico=icon.ico --include-package=PIL --include-package=uvicorn --include-package=fastapi --include-package=pystray --include-data-file=index.html=index.html --include-data-file=icon.ico=icon.ico win-app.py
+##### 1.3.1 手动打包为可执行文件
 
-如果遇到提示需要安装编译器或其它组件，输入 y 执行即可
+在 Windows 环境下，您可以按照以下步骤将 Managi 打包为独立的 `.exe` 文件：
 
-编译完成后 运行 win-app.exe 即可使用。
-可通过右击托盘图标选择 Exit 退出程序。
-```
+1. 在前序手动部署环节基础上，补充安装打包所需依赖：
+   ```bash
+   pip install nuitka pystray pillow
+   ```
 
-##### 1.3.2 直接下载预打包好的 exe
-下载：[win-app-0.3.0.exe](https://github.com/hochenggang/managi-backend/releases/download/0.3.0/win-app.exe) 25.5 MB
+2. 使用 Nuitka 打包为单文件可执行程序：
+   ```bash
+   nuitka --standalone --onefile --windows-console-mode=disable --windows-icon-from-ico=icon.ico --include-package=PIL --include-package=uvicorn --include-package=fastapi --include-package=pystray --include-data-file=index.html=index.html --include-data-file=icon.ico=icon.ico win-app.py
+   ```
+
+   如果提示需要安装编译器或其他组件，请根据提示完成安装。
+
+3. 编译完成后，运行生成的 `win-app.exe` 文件即可使用。右键点击托盘图标可选择退出程序。
+
+##### 1.3.2 下载预编译的可执行文件
+
+如果您不想手动编译，可以直接下载我们预编译的版本：
+
+[win-app-0.3.0.exe](https://github.com/hochenggang/managi-backend/releases/download/0.3.0/win-app.exe) （大小：25.5 MB）
+
+---
 
 ## 贡献指南
 
-欢迎提交 Issue 和 Pull Request！
+我们欢迎任何形式的贡献！如果您发现任何问题或有改进建议，请随时提交 [Issue](https://github.com/hochenggang/managi-backend/issues) 或 [Pull Request](https://github.com/hochenggang/managi-backend/pulls)。
+
+---
 
 ## 许可证
 
-本项目基于 [MIT 许可证](LICENSE) 开源。
+本项目基于 [MIT 许可证](LICENSE) 开源，您可以自由地使用、修改和分发本项目。
+
+---
+
+## 致谢
+
+Managi 的开发离不开以下优秀的开源项目和库的支持，在此向这些项目的贡献者表示衷心感谢！
+
+- **[FastAPI](https://fastapi.tiangolo.com/)**：用于构建高效、现代化的 Web API，提供了灵活且强大的开发体验。
+- **[xterm.js](https://xtermjs.org/)**：一个基于 Web 的终端模拟器组件，为 Managi 提供了流畅的 SSH 终端交互体验。
+- **[Paramiko](https://www.paramiko.org/)**：一个 Python 实现的 SSH 协议库，为 Managi 的核心功能提供了底层支持。
+- 其他依赖库和工具（详见 `requirements.txt` 或本文档提及的第三方库）。
+
+Managi 在这些开源项目的基础上进行了创新与整合，并同样采用 [MIT 许可证](LICENSE) 开源，期待您的参与和支持！
+
+如果您对 Managi 或相关技术有任何疑问或建议，欢迎随时 Issue。
