@@ -2,6 +2,8 @@ from typing import List
 import time
 import json
 import io
+import sys
+import os
 import asyncio
 
 
@@ -16,6 +18,17 @@ from fastapi.websockets import WebSocketState
 
 from pydantic import BaseModel
 import paramiko
+
+
+# 获取静态文件路径
+def get_resource_path(relative_path):
+    if hasattr(sys, "_MEIPASS"):
+        # Nuitka 打包后的路径
+        return os.path.join(sys._MEIPASS, relative_path)
+    return relative_path
+
+
+sys.stdout = open(get_resource_path("log.txt"), "w")
 
 
 # FastAPI 应用
@@ -137,7 +150,8 @@ def test_ssh_connection(node: Node, cmds: List[str]) -> CmdsTestResult:
 
 @app.get("/")
 async def get():
-    with open("index.html", "r", encoding="utf-8") as f:
+    html_path = get_resource_path("index.html")
+    with open(html_path, "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
 
@@ -178,11 +192,11 @@ async def websocket_endpoint(websocket: WebSocket):
             while True:
                 if channel.recv_ready():
                     try:
-                        data = channel.recv(1024).decode("utf-8",errors="ignore")
+                        data = channel.recv(1024).decode("utf-8", errors="ignore")
                         await websocket.send_text(data)
                     except Exception as e:
                         await websocket.send_text(str(e))
-                        
+
                 await asyncio.sleep(0.1)
 
         async def forward_input():
@@ -240,4 +254,6 @@ if __name__ == "__main__":
 
     # 解析命令行参数
     args = parser.parse_args()
-    uvicorn.run(app, host="0.0.0.0", port=args.port)
+    uvicorn.run(
+        app, host="0.0.0.0", port=args.port, log_level="error", access_log=False
+    )
