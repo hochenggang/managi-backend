@@ -1,0 +1,89 @@
+name: Build and Release win-app.exe
+
+on:
+  push:
+    branches-ignore:
+      - main  # 忽略 main 分支
+  workflow_dispatch:  # 允许手动触发工作流
+
+jobs:
+  build:
+    runs-on: windows-latest  # 使用 Windows 环境
+
+    steps:
+      # 1. 检出代码
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. 设置 Python 环境
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'  # 根据需要选择 Python 版本
+
+      # 3. 安装依赖
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nuitka pystray pillow fastapi paramiko uvicorn websockets
+
+      # 4. 构建可执行文件
+      - name: Build with Nuitka
+        run: |
+          nuitka --standalone --onefile --windows-console-mode=disable --windows-icon-from-ico=icon.ico \
+            --include-package=PIL --include-package=uvicorn --include-package=fastapi --include-package=pystray \
+            --include-data-file=index.html=index.html --include-data-file=icon.ico=icon.ico win-app.py
+
+      # 5. 打包构建产物
+      - name: Package artifact
+        run: |
+          mkdir dist
+          mv win-app.exe dist/
+          7z a dist.zip dist/*
+
+      # 6. 上传构建产物到 GitHub Artifacts
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: win-app-exe
+          path: dist.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest  # 使用 Linux 环境进行发布
+
+    steps:
+      # 1. 下载构建产物
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: win-app-exe
+          path: dist
+
+      # 2. 解压构建产物
+      - name: Extract artifact
+        run: |
+          sudo apt-get update && sudo apt-get install -y unzip
+          unzip dist/dist.zip -d dist/
+
+      # 3. 创建 GitHub Release 并上传 exe 文件
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}  # 使用分支名称作为版本号
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/win-app.exe
+          asset_name: win-app.exe
+          asset_content_type: application/octet-stream

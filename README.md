@@ -1,8 +1,11 @@
-# Managi < 管理你的机
+# Managi 
 
-[直接预览 Demo](https://managi.imhcg.cn/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Managi 是一款轻量级的网页版 SSH 管理工具，基于 Python 提供 WebSocket 到 SSH 协议的中继服务。通过简洁直观的界面，用户可以轻松管理多个服务器，执行批量命令操作，实现高效的运维体验。
+[ENGLISH](./README-en.md)
+
+Managi 是一款轻量级的网页版 SSH 管理工具，轻易搭建，轻松可用，没有心智负担。
+
 
 ![预览图](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/xterm.jpg)
 
@@ -23,7 +26,7 @@ Managi 是一款轻量级的网页版 SSH 管理工具，基于 Python 提供 We
 通过 Docker 镜像快速部署 Managi：
 
 ```bash
-docker run -d --network host hochenggang/managi:0.3.0
+docker run -d --network host hochenggang/managi:0.3.1
 ```
 
 如果需要从源码构建镜像，可以执行以下步骤：
@@ -31,8 +34,8 @@ docker run -d --network host hochenggang/managi:0.3.0
 ```bash
 git clone https://github.com/hochenggang/managi-backend.git
 cd managi-backend
-docker build -t managi:0.3.0 .
-docker run -d --network host managi:0.3.0
+docker build -t managi:0.3.1 .
+docker run -d --network host managi:0.3.1
 ```
 
 部署完成后，访问 `http://IP:18001` 即可开始使用。您还可以配置反向代理和域名以满足实际需求。
@@ -82,7 +85,7 @@ python app.py -p 8000
 
 如果您不想手动编译，可以直接下载我们预编译的版本：
 
-[win-app-0.3.0.exe](https://github.com/hochenggang/managi-backend/releases/download/0.3.0/win-app.exe) （大小：25.5 MB）
+[releases](https://github.com/hochenggang/managi-backend/releases/)
 
 ---
 
