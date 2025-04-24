@@ -37,13 +37,11 @@ jobs:
       # 5. 打包构建产物
       - name: Package artifact
         run: |
-          mkdir dist
-          mv win-app.exe dist/
-          7z a dist.zip dist/*
+          7z a dist.zip win-app.exe
 
       # 6. 上传构建产物到 GitHub Artifacts
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: win-app-exe
           path: dist.zip
