@@ -30,7 +30,7 @@ jobs:
       # 4. 构建可执行文件
       - name: Build with Nuitka
         run: |
-          nuitka --standalone --onefile --windows-console-mode=disable --windows-icon-from-ico=icon.ico --include-package=PIL --include-package=uvicorn --include-package=fastapi --include-package=pystray --include-data-file=index.html=index.html --include-data-file=icon.ico=icon.ico win-app.py
+          nuitka --standalone --onefile --assume-yes-for-downloads --windows-console-mode=disable --windows-icon-from-ico=icon.ico --include-package=PIL --include-package=uvicorn --include-package=fastapi --include-package=pystray --include-data-file=index.html=index.html --include-data-file=icon.ico=icon.ico win-app.py
 
       # 5. 打包构建产物
       - name: Package artifact

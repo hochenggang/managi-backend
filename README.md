@@ -74,7 +74,7 @@ python app.py -p 8000
 
 2. 使用 Nuitka 打包为单文件可执行程序：
    ```bash
-   nuitka --standalone --onefile --windows-console-mode=disable --windows-icon-from-ico=icon.ico --include-package=PIL --include-package=uvicorn --include-package=fastapi --include-package=pystray --include-data-file=index.html=index.html --include-data-file=icon.ico=icon.ico win-app.py
+   nuitka --standalone  --onefile --assume-yes-for-downloads --windows-console-mode=disable  --windows-icon-from-ico=icon.ico --include-package=PIL --include-package=uvicorn --include-package=fastapi --include-package=pystray --include-data-file=index.html=index.html --include-data-file=icon.ico=icon.ico win-app.py
    ```
 
    如果提示需要安装编译器或其他组件，请根据提示完成安装。
