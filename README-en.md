@@ -2,6 +2,10 @@
 
 Managi is a lightweight, web-based SSH management tool designed for effortless setup and seamless usability, ensuring a hassle-free experience.
 
+
+> Update-20250425: The Windows application is automatically compiled via GitHub Actions, ensuring a transparent build process you can trust. [Download now from the releases page.](https://github.com/hochenggang/managi-backend/releases/)
+
+
 ![Preview](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/xterm.jpg)
 
 ## Key Features
@@ -19,7 +23,7 @@ Managi is a lightweight, web-based SSH management tool designed for effortless s
 Deploy Managi quickly using the Docker image:
 
 ```bash
-docker run -d --network host hochenggang/managi:0.3.1
+docker run -d --network host hochenggang/managi:0.3.2
 ```
 
 If you prefer to build the image from source, follow these steps:
@@ -27,8 +31,8 @@ If you prefer to build the image from source, follow these steps:
 ```bash
 git clone https://github.com/hochenggang/managi-backend.git
 cd managi-backend
-docker build -t managi:0.3.1 .
-docker run -d --network host managi:0.3.1
+docker build -t managi:0.3.2 .
+docker run -d --network host managi:0.3.2
 ```
 
 Once deployed, access `http://IP:18001` to start using Managi. You can also configure reverse proxies and domain names as needed.

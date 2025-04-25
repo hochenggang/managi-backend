@@ -6,6 +6,8 @@
 
 Managi 是一款轻量级的网页版 SSH 管理工具，轻易搭建，轻松可用，没有心智负担。
 
+> 更新-20250425 ：Windows 应用由 Github Actions 自动编译生成，过程透明，可放心使用。[可前往发布页面下载。](https://github.com/hochenggang/managi-backend/releases/)
+
 
 ![预览图](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/xterm.jpg)
 
@@ -26,7 +28,7 @@ Managi 是一款轻量级的网页版 SSH 管理工具，轻易搭建，轻松�
 通过 Docker 镜像快速部署 Managi：
 
 ```bash
-docker run -d --network host hochenggang/managi:0.3.1
+docker run -d --network host hochenggang/managi:0.3.2
 ```
 
 如果需要从源码构建镜像，可以执行以下步骤：
@@ -34,8 +36,8 @@ docker run -d --network host hochenggang/managi:0.3.1
 ```bash
 git clone https://github.com/hochenggang/managi-backend.git
 cd managi-backend
-docker build -t managi:0.3.1 .
-docker run -d --network host managi:0.3.1
+docker build -t managi:0.3.2 .
+docker run -d --network host managi:0.3.2
 ```
 
 部署完成后，访问 `http://IP:18001` 即可开始使用。您还可以配置反向代理和域名以满足实际需求。
@@ -85,7 +87,7 @@ python app.py -p 8000
 
 如果您不想手动编译，可以直接下载我们预编译的版本：
 
-[releases](https://github.com/hochenggang/managi-backend/releases/)
+[前往发布页](https://github.com/hochenggang/managi-backend/releases/)
 
 ---
 
