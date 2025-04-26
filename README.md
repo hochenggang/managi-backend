@@ -6,17 +6,21 @@
 
 Managi 是一款轻量级的网页版 SSH 管理工具，轻易搭建，轻松可用，没有心智负担。
 
-> 更新-20250425 ：Windows 应用由 Github Actions 自动编译生成，过程透明，可放心使用。[可前往发布页面下载。](https://github.com/hochenggang/managi-backend/releases/)
+
+> Windows 应用由 Github Actions 自动编译生成，过程透明，可放心使用。[可前往发布页面下载。](https://github.com/hochenggang/managi-backend/releases/)
 
 
-![预览图](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/xterm.jpg)
+![批量执行页面](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/page-cmds.jpg)
+![SSH页面](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/page-xterm.jpg)
+![文件管理页面](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/page-finder.jpg)
 
 
 ## 功能特性
 
-- **WEB SSH 终端**：在浏览器中直接管理多台服务器，所有数据均保存在本地。支持通过密码或密钥进行 SSH 连接。
-- **批量命令执行**：一键向多台服务器发送命令，例如修改密码、更新系统软件包等，大幅提升运维效率。
 - **极简设计**：界面清爽、功能专注，资源占用极低，适合各种规模的团队和个人使用。
+- **批量命令执行**：一键向多台服务器发送命令，例如修改密码、更新系统软件包等，大幅提升运维效率。
+- **WEB SSH 终端**：在浏览器中直接管理多台服务器，所有数据均保存在本地。支持通过密码或密钥进行 SSH 连接。
+- **易用的文件管理**：在浏览器中直接查看、上传、下载服务器中的文件。
 
 
 ## 快速开始
@@ -28,7 +32,7 @@ Managi 是一款轻量级的网页版 SSH 管理工具，轻易搭建，轻松�
 通过 Docker 镜像快速部署 Managi：
 
 ```bash
-docker run -d --network host hochenggang/managi:0.3.2
+docker run -d --network host hochenggang/managi:0.5.0
 ```
 
 如果需要从源码构建镜像，可以执行以下步骤：
@@ -36,8 +40,8 @@ docker run -d --network host hochenggang/managi:0.3.2
 ```bash
 git clone https://github.com/hochenggang/managi-backend.git
 cd managi-backend
-docker build -t managi:0.3.2 .
-docker run -d --network host managi:0.3.2
+docker build -t managi:0.5.0 .
+docker run -d --network host managi:0.5.0
 ```
 
 部署完成后，访问 `http://IP:18001` 即可开始使用。您还可以配置反向代理和域名以满足实际需求。

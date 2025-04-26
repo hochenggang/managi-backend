@@ -3,16 +3,21 @@
 Managi is a lightweight, web-based SSH management tool designed for effortless setup and seamless usability, ensuring a hassle-free experience.
 
 
-> Update-20250425: The Windows application is automatically compiled via GitHub Actions, ensuring a transparent build process you can trust. [Download now from the releases page.](https://github.com/hochenggang/managi-backend/releases/)
+> The Windows application is automatically compiled via GitHub Actions, ensuring a transparent build process you can trust. [Download now from the releases page.](https://github.com/hochenggang/managi-backend/releases/)
 
 
-![Preview](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/xterm.jpg)
+![CMDS](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/page-cmds.jpg)
+![SSH](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/page-xterm.jpg)
+![Finder](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/page-finder.jpg)
+
 
 ## Key Features
 
-- **Web SSH Terminal**: Manage multiple servers directly from your browser, with all data securely stored locally. Supports SSH connections via both password and key authentication.
-- **Batch Command Execution**: Execute commands across multiple servers with a single click—such as changing passwords or updating system packages—significantly boosting operational efficiency.
 - **Minimalist Design**: A clean, focused interface with minimal resource consumption, making it suitable for teams and individuals of all sizes.
+- **Batch Command Execution**: Execute commands across multiple servers with a single click—such as changing passwords or updating system packages—significantly boosting operational efficiency.
+- **Web SSH Terminal**: Manage multiple servers directly from your browser, with all data securely stored locally. Supports SSH connections via both password and key authentication.
+- **User-friendly file management**: View, upload, and download files directly in the browser.
+
 
 ## Quick Start
 
@@ -23,7 +28,7 @@ Managi is a lightweight, web-based SSH management tool designed for effortless s
 Deploy Managi quickly using the Docker image:
 
 ```bash
-docker run -d --network host hochenggang/managi:0.3.2
+docker run -d --network host hochenggang/managi:0.3.3
 ```
 
 If you prefer to build the image from source, follow these steps:
@@ -31,8 +36,8 @@ If you prefer to build the image from source, follow these steps:
 ```bash
 git clone https://github.com/hochenggang/managi-backend.git
 cd managi-backend
-docker build -t managi:0.3.2 .
-docker run -d --network host managi:0.3.2
+docker build -t managi:0.5.0 .
+docker run -d --network host managi:0.5.0
 ```
 
 Once deployed, access `http://IP:18001` to start using Managi. You can also configure reverse proxies and domain names as needed.
