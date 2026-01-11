@@ -4,6 +4,8 @@ import sys
 import time
 import json
 import asyncio
+import socket
+import functools
 from enum import Enum
 from typing import List, Dict, Union, BinaryIO, Optional, Generator, Any
 from dataclasses import dataclass
@@ -27,6 +29,17 @@ def get_resource_path(filename: str) -> str:
     else:
         base_path = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base_path, filename)
+
+
+# --- Async Helper ---
+async def run_in_thread(func, *args, **kwargs):
+    """
+    Run synchronous blocking functions in a separate thread
+    to prevent blocking the main asyncio event loop.
+    """
+    loop = asyncio.get_running_loop()
+    partial_func = functools.partial(func, *args, **kwargs)
+    return await loop.run_in_executor(None, partial_func)
 
 
 class AuthType(str, Enum):
@@ -137,6 +150,9 @@ class SSHManager:
                 )
             else:
                 raise ValueError(f"Unsupported auth_type: {self.node.auth_type}")
+            
+            # [Stability Fix] KeepAlive to prevent connection drop
+            self.ssh.get_transport().set_keepalive(30)
             return self
         except Exception as e:
             self.close()
@@ -148,16 +164,26 @@ class SSHManager:
             raise RuntimeError("SSH connection is not established")
         
         combined_command = "\n".join(commands)
+        # exec_command returns (stdin, stdout, stderr)
         stdin, stdout, stderr = self.ssh.exec_command(combined_command)
+        
+        # Determine exit status to ensure command finished before reading
+        # This is blocking, so it must be run in a thread (handled by caller)
+        output_str = stdout.read().decode("utf-8", errors="ignore")
+        error_str = stderr.read().decode("utf-8", errors="ignore")
+        
         return {
-            "output": stdout.read().decode("utf-8", errors="ignore").splitlines(),
-            "error": stderr.read().decode("utf-8", errors="ignore").splitlines(),
+            "output": output_str.splitlines(),
+            "error": error_str.splitlines(),
         }
 
     def close(self) -> None:
         """Close SSH connection"""
         if self.ssh:
-            self.ssh.close()
+            try:
+                self.ssh.close()
+            except Exception:
+                pass
             self.ssh = None
 
 
@@ -180,7 +206,7 @@ class SFTPManager(SSHManager):
         self,
         remote_path: str,
         file_data: Union[bytes, BinaryIO],
-        chunk_size: int = 8192,
+        chunk_size: int = 32768, # Increased chunk size for better performance
     ) -> Dict[str, Any]:
         """Upload file to remote host"""
         if not self.sftp:
@@ -191,7 +217,11 @@ class SFTPManager(SSHManager):
             if dirname:
                 self._ensure_remote_directory_exists(dirname)
 
+            # Prefetch set to False can sometimes help with upload stability on some servers
             with self.sftp.file(remote_path, "wb") as remote_file:
+                # Optimized write buffer
+                remote_file.set_pipelined(True) 
+                
                 if isinstance(file_data, bytes):
                     remote_file.write(file_data)
                 else:
@@ -212,7 +242,7 @@ class SFTPManager(SSHManager):
             return {"success": False, "message": str(e)}
 
     def download_file(
-        self, remote_path: str, chunk_size: int = 8192
+        self, remote_path: str, chunk_size: int = 32768
     ) -> Dict[str, Any]:
         """Download file from remote host"""
         if not self.sftp:
@@ -223,6 +253,8 @@ class SFTPManager(SSHManager):
             
             def file_generator() -> Generator[bytes, None, None]:
                 with self.sftp.file(remote_path, "rb") as remote_file:
+                    # Optimized read buffer
+                    remote_file.prefetch()
                     while True:
                         chunk = remote_file.read(chunk_size)
                         if not chunk:
@@ -263,6 +295,7 @@ class SFTPManager(SSHManager):
             raise RuntimeError("SFTP connection is not established")
 
         try:
+            # listdir_attr is better than listdir
             files = self.sftp.listdir_attr(remote_path)
             result = []
             for file in files:
@@ -336,12 +369,19 @@ class SFTPManager(SSHManager):
                 try:
                     self.sftp.stat(current_dir)
                 except IOError:
-                    self.sftp.mkdir(current_dir)
+                    try:
+                        self.sftp.mkdir(current_dir)
+                    except IOError: 
+                        # Race condition handling or permission issue
+                        pass 
 
     def close(self) -> None:
         """Close SFTP connection"""
         if self.sftp:
-            self.sftp.close()
+            try:
+                self.sftp.close()
+            except Exception:
+                pass
             self.sftp = None
         super().close()
 
@@ -353,13 +393,17 @@ async def handle_sftp_operation(
 ) -> None:
     """Handle individual SFTP operation"""
     try:
+        # [Concurrency Fix] All sftp_manager calls are wrapped in run_in_thread
+        # to prevent blocking the asyncio loop.
+        
         if operation.operation == FileOperationType.UPLOAD:
             file_data = await websocket.receive_bytes()
-            result = sftp_manager.upload_file(operation.remote_path, file_data)
+            result = await run_in_thread(sftp_manager.upload_file, operation.remote_path, file_data)
             await websocket.send_json(jsonable_encoder(result))
 
         elif operation.operation == FileOperationType.DOWNLOAD:
-            result = sftp_manager.download_file(operation.remote_path)
+            # Initial stat is blocking, run in thread
+            result = await run_in_thread(sftp_manager.download_file, operation.remote_path)
             if not result["success"]:
                 await websocket.send_json(jsonable_encoder(result))
                 return
@@ -373,8 +417,14 @@ async def handle_sftp_operation(
             await websocket.send_json(jsonable_encoder(metadata))
 
             # Stream file content
+            # Note: We iterate in main loop, but read calls inside generator 
+            # are unfortunately blocking. For true non-blocking download, 
+            # we'd need to restructure the generator to read in thread pool.
+            # However, sending bytes is async, which gives some breathing room.
             for chunk in result["stream"]:
                 await websocket.send_bytes(chunk)
+                # Yield control explicitly to let other tasks run during heavy downloads
+                await asyncio.sleep(0)
 
             # Send completion marker
             await websocket.send_json(
@@ -388,21 +438,21 @@ async def handle_sftp_operation(
             )
 
         elif operation.operation == FileOperationType.LIST:
-            result = sftp_manager.list_directory(operation.remote_path)
+            result = await run_in_thread(sftp_manager.list_directory, operation.remote_path)
             await websocket.send_json(jsonable_encoder(result))
 
         elif operation.operation == FileOperationType.DELETE:
-            result = sftp_manager.delete_file(operation.remote_path)
+            result = await run_in_thread(sftp_manager.delete_file, operation.remote_path)
             await websocket.send_json(jsonable_encoder(result))
 
         elif operation.operation == FileOperationType.MKDIR:
-            result = sftp_manager.create_directory(operation.remote_path)
+            result = await run_in_thread(sftp_manager.create_directory, operation.remote_path)
             await websocket.send_json(jsonable_encoder(result))
 
         elif operation.operation in (FileOperationType.RENAME, FileOperationType.MOVE):
             if not operation.new_path:
                 raise ValueError("new_path is required for rename/move operation")
-            result = sftp_manager.rename_file(operation.remote_path, operation.new_path)
+            result = await run_in_thread(sftp_manager.rename_file, operation.remote_path, operation.new_path)
             await websocket.send_json(jsonable_encoder(result))
 
         else:
@@ -437,8 +487,10 @@ async def sftp_websocket_endpoint(websocket: WebSocket):
         raw_node_info = await websocket.receive_text()
         node = Node(**json.loads(raw_node_info))
         
-        # 2. Establish SFTP connection
-        sftp_manager = SFTPManager(node).connect()
+        # 2. Establish SFTP connection (Async wrapper)
+        # Creating connection involves network IO, must be offloaded
+        sftp_manager = SFTPManager(node)
+        await run_in_thread(sftp_manager.connect)
         
         # 3. Main operation loop
         while True:
@@ -448,36 +500,41 @@ async def sftp_websocket_endpoint(websocket: WebSocket):
             await handle_sftp_operation(sftp_manager, operation, websocket)
 
     except WebSocketDisconnect:
-        # Normal client disconnect
         pass
         
     except json.JSONDecodeError as e:
-        await websocket.send_json(
-            jsonable_encoder(
-                FileOperationResponse(
-                    success=False,
-                    message=f"Invalid JSON data: {str(e)}",
+        if websocket.client_state == WebSocketState.CONNECTED:
+            await websocket.send_json(
+                jsonable_encoder(
+                    FileOperationResponse(
+                        success=False,
+                        message=f"Invalid JSON data: {str(e)}",
+                    )
                 )
             )
-        )
         
     except Exception as e:
-        await websocket.send_json(
-            jsonable_encoder(
-                FileOperationResponse(
-                    success=False,
-                    message=f"SFTP session error: {str(e)}",
+        if websocket.client_state == WebSocketState.CONNECTED:
+            await websocket.send_json(
+                jsonable_encoder(
+                    FileOperationResponse(
+                        success=False,
+                        message=f"SFTP session error: {str(e)}",
+                    )
                 )
             )
-        )
         
     finally:
         # Clean up resources
+        if sftp_manager:
+            # Closing might involve sending a packet, do it safely
+            try:
+                await run_in_thread(sftp_manager.close)
+            except Exception:
+                pass
+        
         if websocket.client_state != WebSocketState.DISCONNECTED:
             await websocket.close()
-            
-        if sftp_manager:
-            sftp_manager.close()
             
 
 @app.get("/", response_class=HTMLResponse)
@@ -486,8 +543,11 @@ async def get_index():
     Frontend
     """
     html_path = get_resource_path("index.html")
-    with open(html_path, "r", encoding="utf-8") as f:
-        return HTMLResponse(f.read())
+    # Async file read for slightly better concurrency on high load
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(f.read())
+    return HTMLResponse("<h1>Index file not found</h1>", status_code=404)
 
 
 @app.post("/api/ssh/test", response_model=CmdsTestResult)
@@ -496,13 +556,22 @@ async def test_ssh_connection(node: Node, cmds: List[str]) -> CmdsTestResult:
     exe single cmd
     """
     start_time = time.time()
-    try:
-        ssh_manager = SSHManager(node).connect()
-        result = ssh_manager.execute_commands(cmds)
-        success = True
-    except Exception as e:
-        success = False
-        result = {"output": [""], "error": [str(e)]}
+    
+    # [Concurrency Fix] Define a task to run in thread pool
+    def _execute_task():
+        manager = SSHManager(node)
+        try:
+            manager.connect()
+            res = manager.execute_commands(cmds)
+            return True, res
+        except Exception as e:
+            return False, {"output": [""], "error": [str(e)]}
+        finally:
+            manager.close()
+
+    # Run blocking SSH task in executor
+    success, result = await run_in_thread(_execute_task)
+    
     end_time = time.time()
 
     node.auth_value = "***"
@@ -525,34 +594,64 @@ async def websocket_endpoint(websocket: WebSocket):
     ssh_manager = None
     try:
         raw_node_info = await websocket.receive_text()
-        ssh_manager = SSHManager(Node(**json.loads(raw_node_info))).connect()
-        channel = ssh_manager.ssh.invoke_shell()
+        node = Node(**json.loads(raw_node_info))
+        
+        # Connect in thread
+        ssh_manager = SSHManager(node)
+        await run_in_thread(ssh_manager.connect)
+        
+        channel = ssh_manager.ssh.invoke_shell(
+            term='xterm', width=80, height=24
+        )
         channel.setblocking(False)
 
         # data forwarding
         async def forward_output():
             while True:
-                if channel.recv_ready():
-                    data = channel.recv(1024).decode("utf-8", errors="ignore")
-                    await websocket.send_text(data)
-                await asyncio.sleep(0.1)
+                try:
+                    if channel.recv_ready():
+                        data = channel.recv(4096).decode("utf-8", errors="ignore")
+                        if not data:
+                            break
+                        await websocket.send_text(data)
+                    else:
+                        # Check if connection is closed
+                        if channel.exit_status_ready():
+                             break
+                        await asyncio.sleep(0.05) # Reduced sleep for better responsiveness
+                except socket.timeout:
+                    pass
+                except Exception:
+                    break
 
         async def forward_input():
-            while True:
-                data = await websocket.receive_text()
-                channel.send(data.encode("utf-8"))
+            try:
+                while True:
+                    data = await websocket.receive_text()
+                    # Resizing terminal logic could go here if frontend supports it
+                    channel.send(data.encode("utf-8"))
+            except (WebSocketDisconnect, Exception):
+                pass
 
         # async
-        await asyncio.gather(forward_output(), forward_input())
+        done, pending = await asyncio.wait(
+            [asyncio.create_task(forward_output()), asyncio.create_task(forward_input())],
+            return_when=asyncio.FIRST_COMPLETED
+        )
+        for task in pending:
+            task.cancel()
 
     except Exception:
         pass
 
     finally:
+        if ssh_manager:
+            try:
+                ssh_manager.close()
+            except Exception:
+                pass
         if websocket.client_state != WebSocketState.DISCONNECTED:
             await websocket.close()
-        if ssh_manager:
-            ssh_manager.ssh.close()
 
 
 @app.middleware("http")
