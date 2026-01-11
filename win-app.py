@@ -1,97 +1,92 @@
 import os
 import sys
-import time
 import threading
-import webbrowser
 import socket
-from uvicorn import Config, Server
+import webbrowser
+import uvicorn
 from pystray import Icon, Menu, MenuItem
 from PIL import Image
 
-from app import app
+# --- 处理 Nuitka/打包环境下的导入路径 ---
+if getattr(sys, "frozen", False) or "nuitka" in sys.modules:
+    # 确保程序能找到编译后的模块
+    sys.path.append(os.path.dirname(sys.argv[0]))
 
+# 导入 FastAPI 实例
+try:
+    from app import app
+except ImportError as e:
+    # 如果打包失败，这里会捕获
+    print(f"Import Error: {e}")
 
+# --- 动态获取资源路径 ---
 def get_resource_path(filename):
-    """获取静态文件路径"""
-    if getattr(sys, "frozen", False):  # 检查是否为打包环境
-        base_path = sys._MEIPASS
-    else:
+    """
+    兼容开发环境、PyInstaller 和 Nuitka 的路径获取方式
+    """
+    if getattr(sys, "frozen", False):
+        # PyInstaller 方式
+        base_path = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+    elif "__file__" in globals():
+        # 普通脚本方式
         base_path = os.path.dirname(os.path.abspath(__file__))
+    else:
+        # Nuitka 编译后的二进制方式
+        base_path = os.path.dirname(sys.argv[0])
+        
     return os.path.join(base_path, filename)
 
-
-def find_available_port(start_port=18001, end_port=19000):
-    """自动查找指定范围内未被占用的端口"""
-    for port in range(start_port, end_port + 1):
+def find_available_port(start_port=18001):
+    for port in range(start_port, start_port + 100):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            try:
-                s.bind(("127.0.0.1", port))
+            if s.connect_ex(("127.0.0.1", port)) != 0:
                 return port
-            except OSError:
-                continue
-    raise RuntimeError("未找到可用端口")
+    return start_port
 
-
-# 启动 Uvicorn 服务器
+# --- 更稳定的服务器启动函数 ---
 def run_server(port):
-    config = Config(
-        app=app, host="127.0.0.1", port=port, log_level="warning", access_log=False
-    )
-    server = Server(config)
-    server.run()
+    try:
+        # 必须显式传入 app 对象，而不是字符串 "app:app"
+        # 必须设置 workers=1，打包环境不支持多进程 reload
+        config = uvicorn.Config(
+            app, 
+            host="127.0.0.1", 
+            port=port, 
+            log_level="info", 
+            access_log=False,
+            workers=1
+        )
+        server = uvicorn.Server(config)
+        server.run()
+    except Exception as e:
+        with open("server_error.log", "w") as f:
+            f.write(str(e))
 
-
-# 启动浏览器并打开前端页面
-def start_webview(port):
-    """等待服务器启动完成并打开浏览器"""
-    time.sleep(2)  # 等待服务器启动
+def create_tray(port):
+    icon_path = get_resource_path("icon.ico")
     url = f"http://127.0.0.1:{port}"
-    webbrowser.open(url, new=1)
-
-
-# 托盘图标退出回调函数
-def exit_action(icon, server_thread: threading.Thread):
-    """停止托盘图标并终止服务器线程"""
-    icon.stop()
-    global should_exit
-    should_exit = True
-    server_thread.join(timeout=0.5)  # 等待服务器线程优雅退出
-
-
-# 创建托盘图标
-def create_tray_icon(port, server_thread: threading.Thread):
-    """创建系统托盘图标"""
-    image = Image.open(get_resource_path("icon.ico"))
-    url = f"http://127.0.0.1:{port}"
+    
+    image = Image.open(icon_path)
     menu = Menu(
-        MenuItem("Open in Browser", lambda: webbrowser.open(url)),
-        MenuItem("Exit", lambda: exit_action(icon, server_thread)),
+        MenuItem("打开 Managi", lambda: webbrowser.open(url), default=True),
+        MenuItem("退出", lambda icon: icon.stop())
     )
-    icon = Icon("Managi Tray", image, "Managi Running", menu)
+    icon = Icon("Managi", image, f"Managi (Port: {port})", menu)
+    
+    # 自动开启网页
+    threading.Timer(1.5, lambda: webbrowser.open(url)).start()
     icon.run()
 
-
 if __name__ == "__main__":
-    # 全局变量，用于控制程序退出
-    global should_exit
-    should_exit = False
+    # Nuitka onefile 需要这行防止无限自启
+    import multiprocessing
+    multiprocessing.freeze_support()
 
-    # 自动查找未被占用的端口
     port = find_available_port()
+    
+    # 启动服务器线程
+    t = threading.Thread(target=run_server, args=(port,), daemon=True)
+    t.start()
 
-    # 在单独线程中启动 Uvicorn 服务器
-    server_thread = threading.Thread(target=run_server, args=(port,), daemon=True)
-    server_thread.start()
-
-    # 启动浏览器
-    start_webview(port)
-
-    # 启动托盘图标
-    tray_thread = threading.Thread(
-        target=create_tray_icon, args=(port, server_thread), daemon=True
-    )
-    tray_thread.start()
-
-    # 主线程保持运行，直到接收到退出信号
-    while not should_exit:
-        time.sleep(0.1)
+    # 启动托盘 (阻塞主线程)
+    create_tray(port)
