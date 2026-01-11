@@ -1,97 +1,70 @@
 import os
 import sys
-import time
 import threading
-import webbrowser
 import socket
-from uvicorn import Config, Server
+import webbrowser
+import uvicorn
 from pystray import Icon, Menu, MenuItem
 from PIL import Image
-
 from app import app
 
-
+# 获取资源路径
 def get_resource_path(filename):
-    """获取静态文件路径"""
-    if getattr(sys, "frozen", False):  # 检查是否为打包环境
+    if getattr(sys, "frozen", False):
         base_path = sys._MEIPASS
     else:
         base_path = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base_path, filename)
 
-
+# 端口发现
 def find_available_port(start_port=18001, end_port=19000):
-    """自动查找指定范围内未被占用的端口"""
     for port in range(start_port, end_port + 1):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            try:
-                s.bind(("127.0.0.1", port))
+            if s.connect_ex(("127.0.0.1", port)) != 0: # connect_ex 返回 0 表示端口被占用
                 return port
-            except OSError:
-                continue
-    raise RuntimeError("未找到可用端口")
+    raise RuntimeError("No available ports found")
 
-
-# 启动 Uvicorn 服务器
+# 服务器运行
 def run_server(port):
-    config = Config(
-        app=app, host="127.0.0.1", port=port, log_level="warning", access_log=False
-    )
-    server = Server(config)
+    # 使用 uvicorn.Config 配合 Server 类可以实现更精细的控制
+    config = uvicorn.Config(app=app, host="127.0.0.1", port=port, log_level="warning")
+    server = uvicorn.Server(config)
     server.run()
 
+class ManagiApp:
+    def __init__(self):
+        self.port = find_available_port()
+        self.url = f"http://127.0.0.1:{self.port}"
+        self.icon = None
 
-# 启动浏览器并打开前端页面
-def start_webview(port):
-    """等待服务器启动完成并打开浏览器"""
-    time.sleep(2)  # 等待服务器启动
-    url = f"http://127.0.0.1:{port}"
-    webbrowser.open(url, new=1)
+    def open_url(self):
+        webbrowser.open(self.url)
 
+    def quit_app(self, icon):
+        icon.stop() # 停止托盘，主线程随之结束，子线程(daemon)会自动销毁
 
-# 托盘图标退出回调函数
-def exit_action(icon, server_thread: threading.Thread):
-    """停止托盘图标并终止服务器线程"""
-    icon.stop()
-    global should_exit
-    should_exit = True
-    server_thread.join(timeout=0.5)  # 等待服务器线程优雅退出
+    def run(self):
+        # 1. 启动服务器 (子线程 + Daemon)
+        server_thread = threading.Thread(target=run_server, args=(self.port,), daemon=True)
+        server_thread.start()
 
+        # 2. 延迟打开浏览器
+        threading.Timer(1.5, self.open_url).start()
 
-# 创建托盘图标
-def create_tray_icon(port, server_thread: threading.Thread):
-    """创建系统托盘图标"""
-    image = Image.open(get_resource_path("icon.ico"))
-    url = f"http://127.0.0.1:{port}"
-    menu = Menu(
-        MenuItem("Open in Browser", lambda: webbrowser.open(url)),
-        MenuItem("Exit", lambda: exit_action(icon, server_thread)),
-    )
-    icon = Icon("Managi Tray", image, "Managi Running", menu)
-    icon.run()
-
+        # 3. 创建并启动托盘图标 (主线程)
+        image = Image.open(get_resource_path("icon.ico"))
+        menu = Menu(
+            MenuItem("打开控制面板", self.open_url, default=True),
+            MenuItem("退出程序", self.quit_app),
+        )
+        self.icon = Icon("Managi", image, f"Managi (Port: {self.port})", menu)
+        
+        # icon.run 会阻塞主线程，直到调用 icon.stop()
+        self.icon.run()
 
 if __name__ == "__main__":
-    # 全局变量，用于控制程序退出
-    global should_exit
-    should_exit = False
-
-    # 自动查找未被占用的端口
-    port = find_available_port()
-
-    # 在单独线程中启动 Uvicorn 服务器
-    server_thread = threading.Thread(target=run_server, args=(port,), daemon=True)
-    server_thread.start()
-
-    # 启动浏览器
-    start_webview(port)
-
-    # 启动托盘图标
-    tray_thread = threading.Thread(
-        target=create_tray_icon, args=(port, server_thread), daemon=True
-    )
-    tray_thread.start()
-
-    # 主线程保持运行，直到接收到退出信号
-    while not should_exit:
-        time.sleep(0.1)
+    try:
+        managi = ManagiApp()
+        managi.run()
+    except Exception as e:
+        print(f"启动失败: {e}")
