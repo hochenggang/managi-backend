@@ -43,24 +43,30 @@ def find_available_port(start_port=18001):
                 return port
     return start_port
 
-# --- 更稳定的服务器启动函数 ---
+
 def run_server(port):
+    import logging
+    
+    # 全局禁用所有 logging 级别的输出
+    logging.disable(logging.CRITICAL)
+
     try:
-        # 必须显式传入 app 对象，而不是字符串 "app:app"
-        # 必须设置 workers=1，打包环境不支持多进程 reload
         config = uvicorn.Config(
             app, 
             host="127.0.0.1", 
             port=port, 
-            log_level="info", 
-            access_log=False,
-            workers=1
+            log_config=None,      # 必须设为 None，否则它会加载默认字典并报错
+            log_level="critical", # 设为最高级别，确保没有任何输出
+            access_log=False,     # 禁用访问日志
+            workers=1,
+            loop="asyncio"
         )
         server = uvicorn.Server(config)
         server.run()
-    except Exception as e:
-        with open("server_error.log", "w") as f:
-            f.write(str(e))
+    except Exception:
+        import traceback
+        with open("server_error.log", "w", encoding="utf-8") as f:
+            traceback.print_exc(file=f)
 
 def create_tray(port):
     icon_path = get_resource_path("icon.ico")

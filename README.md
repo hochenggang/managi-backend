@@ -73,9 +73,10 @@ python app.py -p 8000
 
 在 Windows 环境下，您可以按照以下步骤将 Managi 打包为独立的 `.exe` 文件：
 
-1. 在前序手动部署环节基础上，补充安装打包所需依赖：
+1. 安装依赖：
    ```bash
-   pip install nuitka pystray pillow
+   pip install -r requirements.txt
+
    ```
 
 2. 使用 Nuitka 打包为单文件可执行程序：
