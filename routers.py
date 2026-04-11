@@ -240,8 +240,12 @@ async def websocket_endpoint(websocket: WebSocket):
         for task in pending:
             task.cancel()
 
-    except Exception:
-        pass
+    except Exception as e:
+        error_msg = f"Connection failed: {str(e)}"
+        try:
+            await websocket.send_text(f"\r\n{error_msg}\r\n")
+        except Exception:
+            pass
 
     finally:
         if ssh_manager:

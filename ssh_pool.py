@@ -36,7 +36,16 @@ class SSHConnection:
                     "banner_timeout": config.banner_timeout,
                 }
             elif self.node.auth_type == AuthType.KEY:
-                key = paramiko.RSAKey.from_private_key(io.StringIO(self.node.auth_value))
+                key = None
+                key_classes = [paramiko.RSAKey, paramiko.Ed25519Key, paramiko.ECDSAKey]
+                for key_class in key_classes:
+                    try:
+                        key = key_class.from_private_key(io.StringIO(self.node.auth_value))
+                        break
+                    except paramiko.SSHException:
+                        continue
+                if key is None:
+                    raise SSHConnectionError("Failed to parse private key")
                 connect_kwargs = {
                     "hostname": self.node.host,
                     "port": self.node.port,
