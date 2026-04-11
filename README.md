@@ -1,121 +1,150 @@
-# Managi 
+# Managi Backend
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+轻量级网页版 SSH 管理工具后端服务
 
-[ENGLISH](./README-en.md)
+## 技术栈
 
-Managi 是一款轻量级的网页版 SSH 管理工具，轻易搭建，轻松可用，没有心智负担。
+| 技术 | 版本 |
+|------|------|
+| FastAPI | 0.115.6 |
+| Uvicorn | 0.34.0 |
+| Paramiko | 3.5.0 |
+| Pydantic | 2.12.5 |
 
+## 项目结构
 
-> Windows 应用由 Github Actions 自动编译生成，过程透明，可放心使用。[可前往发布页面下载。](https://github.com/hochenggang/managi-backend/releases/)
+```
+managi-backend-python/
+├── app.py              # FastAPI 应用入口
+├── routers.py          # API 路由 (SSH/SFTP WebSocket)
+├── models.py           # Pydantic 数据模型
+├── setting.py          # 配置管理 (支持环境变量)
+├── common.py           # 通用工具
+├── ssh_pool.py         # SSH 连接池
+├── sftp_client.py      # SFTP 客户端
+├── index.html          # 前端页面 (打包时嵌入)
+└── requirements.txt    # Python 依赖
+```
 
+## 核心功能
 
-![批量执行页面](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/page-cmds.jpg)
-![SSH页面](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/page-xterm.jpg)
-![文件管理页面](https://raw.githubusercontent.com/hochenggang/managi-backend/refs/heads/main/docs/previews/page-finder.jpg)
+### 1. 批量命令执行
+- **单节点**: `POST /api/ssh/test`
+- **批量**: `POST /api/ssh/batch` (并发执行)
 
+### 2. Web SSH 终端
+- **WebSocket**: `/ws`
+- 支持终端尺寸动态调整
+- 心跳保活机制
 
-## 功能特性
+### 3. SFTP 文件管理
+- **WebSocket**: `/ws/sftp`
+- 支持操作: list, upload, download, mkdir, delete, rename
+- 进度实时推送
 
-- **极简设计**：界面清爽、功能专注，资源占用极低，适合各种规模的团队和个人使用。
-- **批量命令执行**：一键向多台服务器发送命令，例如修改密码、更新系统软件包等，大幅提升运维效率。
-- **WEB SSH 终端**：在浏览器中直接管理多台服务器，所有数据均保存在本地。支持通过密码或密钥进行 SSH 连接。
-- **易用的文件管理**：在浏览器中直接查看、上传、下载服务器中的文件。
+## 配置说明
 
+### 环境变量
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `MANAGI_PORT` | 18001 | 服务端口 |
+| `MANAGI_HOST` | 0.0.0.0 | 绑定地址 |
+| `MANAGI_LOG_LEVEL` | error | 日志级别 |
+| `MANAGI_SSH_TIMEOUT` | 15 | SSH 超时秒数 |
+| `MANAGI_KEEPALIVE` | 30 | 心跳间隔秒数 |
+
+### 配置文件 (setting.py)
+
+```python
+@dataclass
+class SSHConfig:
+    timeout: int = 15              # SSH 连接超时
+    banner_timeout: int = 15       # SSH 横幅超时
+    keepalive_interval: int = 30   # Keepalive 间隔
+
+@dataclass
+class WebSocketConfig:
+    heartbeat_interval: int = 10000  # 心跳间隔 (ms)
+    heartbeat_timeout: int = 10000    # 心跳超时 (ms)
+    max_buffer_size: int = 4096        # 最大缓冲区
+
+@dataclass
+class SFTPConfig:
+    chunk_size: int = 32768          # 分块大小
+    download_chunk_size: int = 65536  # 下载分块
+```
 
 ## 快速开始
 
-### 1. 部署到服务器
-
-#### 1.1 使用 Docker 镜像（推荐）
-
-通过 Docker 镜像快速部署 Managi：
-
-```bash
-docker run -d --network host hochenggang/managi:0.5.0
-```
-
-如果需要从源码构建镜像，可以执行以下步骤：
-
-```bash
-git clone https://github.com/hochenggang/managi-backend.git
-cd managi-backend
-docker build -t managi:0.5.0 .
-docker run -d --network host managi:0.5.0
-```
-
-部署完成后，访问 `http://IP:18001` 即可开始使用。您还可以配置反向代理和域名以满足实际需求。
-
----
-
-#### 1.2 手动部署源代码
-
-确保已安装 Python 3.9+，然后运行以下命令安装依赖并启动服务：
+### 安装依赖
 
 ```bash
 pip install -r requirements.txt
-python app.py
 ```
 
-默认端口为 `18001`，可以通过 `-p` 参数指定其他端口：
+### 启动服务
 
 ```bash
-python app.py -p 8000
+# 默认端口 18001
+python app.py
+
+# 指定端口
+python app.py -p 8080
+
+# 指定地址和端口
+python app.py --host 127.0.0.1 --port 8080
 ```
 
-建议使用进程守护工具（如 `systemd` 或 `supervisord`）来管理服务。
+### Docker 部署
 
----
+```bash
+# 构建镜像
+docker build -t managi:latest .
 
-#### 1.3 Windows 本地使用
+# 运行容器
+docker run -d --network host managi:latest
+```
 
-##### 1.3.1 手动打包为可执行文件
+## API 接口
 
-在 Windows 环境下，您可以按照以下步骤将 Managi 打包为独立的 `.exe` 文件：
+### 命令执行
 
-1. 在前序手动部署环节基础上，补充安装打包所需依赖：
-   ```bash
-   pip install nuitka pystray pillow
-   ```
+```bash
+# 单节点测试
+curl -X POST http://localhost:18001/api/ssh/test \
+  -H "Content-Type: application/json" \
+  -d '{
+    "node": {
+      "name": "server1",
+      "host": "192.168.1.100",
+      "port": 22,
+      "username": "root",
+      "auth_type": "password",
+      "auth_value": "password"
+    },
+    "cmds": ["uname -a", "df -h"]
+  }'
+```
 
-2. 使用 Nuitka 打包为单文件可执行程序：
-   ```bash
-   nuitka --standalone  --onefile --assume-yes-for-downloads --windows-console-mode=disable  --windows-icon-from-ico=icon.ico --include-package=PIL --include-package=uvicorn --include-package=fastapi --include-package=pystray --include-data-file=index.html=index.html --include-data-file=icon.ico=icon.ico win-app.py
-   ```
+### WebSocket 连接
 
-   如果提示需要安装编译器或其他组件，请根据提示完成安装。
+```javascript
+// SSH 终端
+const ws = new WebSocket('ws://localhost:18001/ws');
+ws.onopen = () => ws.send(JSON.stringify(node));
 
-3. 编译完成后，运行生成的 `win-app.exe` 文件即可使用。右键点击托盘图标可选择退出程序。
+// SFTP 文件管理
+const ws = new WebSocket('ws://localhost:18001/ws/sftp');
+```
 
-##### 1.3.2 下载预编译的可执行文件
+## 设计原则
 
-如果您不想手动编译，可以直接下载我们预编译的版本：
-
-[前往发布页](https://github.com/hochenggang/managi-backend/releases/)
-
----
-
-## 贡献指南
-
-我们欢迎任何形式的贡献！如果您发现任何问题或有改进建议，请随时提交 [Issue](https://github.com/hochenggang/managi-backend/issues) 或 [Pull Request](https://github.com/hochenggang/managi-backend/pulls)。
-
----
+- **模块化**: 职责分离，每个文件专注单一功能
+- **配置中心化**: 统一管理配置，支持环境变量覆盖
+- **连接池复用**: SSH 连接池减少重复连接开销
+- **异步化**: 尽可能使用异步处理，提升并发能力
 
 ## 许可证
 
-本项目基于 [MIT 许可证](LICENSE) 开源，您可以自由地使用、修改和分发本项目。
-
----
-
-## 致谢
-
-Managi 的开发离不开以下优秀的开源项目和库的支持，在此向这些项目的贡献者表示衷心感谢！
-
-- **[FastAPI](https://fastapi.tiangolo.com/)**：用于构建高效、现代化的 Web API，提供了灵活且强大的开发体验。
-- **[xterm.js](https://xtermjs.org/)**：一个基于 Web 的终端模拟器组件，为 Managi 提供了流畅的 SSH 终端交互体验。
-- **[Paramiko](https://www.paramiko.org/)**：一个 Python 实现的 SSH 协议库，为 Managi 的核心功能提供了底层支持。
-- 其他依赖库和工具（详见 `requirements.txt` 或本文档提及的第三方库）。
-
-Managi 在这些开源项目的基础上进行了创新与整合，并同样采用 [MIT 许可证](LICENSE) 开源，期待您的参与和支持！
-
-如果您对 Managi 或相关技术有任何疑问或建议，欢迎随时 Issue。
+MIT License
