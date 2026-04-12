@@ -39,11 +39,19 @@ class ServerConfig:
 
 
 @dataclass
+class BasicAuthConfig:
+    enabled: bool = False
+    username: str = "admin"
+    password: str = "admin123"
+
+
+@dataclass
 class AppConfig:
     server: ServerConfig = field(default_factory=ServerConfig)
     ssh: SSHConfig = field(default_factory=SSHConfig)
     websocket: WebSocketConfig = field(default_factory=WebSocketConfig)
     sftp: SFTPConfig = field(default_factory=SFTPConfig)
+    basicauth: BasicAuthConfig = field(default_factory=BasicAuthConfig)
 
 
 def load_config_from_env() -> AppConfig:
@@ -60,6 +68,13 @@ def load_config_from_env() -> AppConfig:
         config.ssh.timeout = int(ssh_timeout)
     if keepalive := os.getenv("MANAGI_KEEPALIVE"):
         config.ssh.keepalive_interval = int(keepalive)
+
+    if enabled := os.getenv("MANAGI_BASICAUTH_ENABLED"):
+        config.basicauth.enabled = enabled.lower() in ("1", "true", "yes")
+    if username := os.getenv("MANAGI_BASICAUTH_USERNAME"):
+        config.basicauth.username = username
+    if password := os.getenv("MANAGI_BASICAUTH_PASSWORD"):
+        config.basicauth.password = password
 
     return config
 
@@ -81,6 +96,10 @@ def get_sftp_config() -> SFTPConfig:
 
 def get_server_config() -> ServerConfig:
     return config.server
+
+
+def get_basicauth_config() -> BasicAuthConfig:
+    return config.basicauth
 
 
 async def run_in_executor(func, *args, **kwargs):
