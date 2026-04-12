@@ -1,3 +1,4 @@
+import base64
 import os
 import sys
 from contextlib import asynccontextmanager
@@ -5,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, Response, JSONResponse
 
-from setting import get_server_config, config as app_config
+from setting import get_server_config, get_basicauth_config, config as app_config
 from routers import router
 from common import safe_json_loads
 
@@ -25,6 +26,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(redoc_url=None, docs_url=None, openapi_url=None, lifespan=lifespan)
 
+
+def verify_basic_auth(auth_header: str) -> bool:
+    basicauth_config = get_basicauth_config()
+    if not basicauth_config.enabled:
+        return True
+
+    if not auth_header or not auth_header.startswith("Basic "):
+        return False
+
+    try:
+        encoded_creds = auth_header[6:]
+        decoded_creds = base64.b64decode(encoded_creds).decode("utf-8")
+        username, password = decoded_creds.split(":", 1)
+        return username == basicauth_config.username and password == basicauth_config.password
+    except Exception:
+        return False
+
+
 app.include_router(router)
 
 
@@ -38,9 +57,20 @@ async def get_index():
 
 
 @app.middleware("http")
-async def add_cors_headers(request: Request, call_next):
+async def basicauth_middleware(request: Request, call_next):
+    basicauth_config = get_basicauth_config()
+
+    if basicauth_config.enabled:
+        auth_header = request.headers.get("authorization", "")
+        if not verify_basic_auth(auth_header):
+            return Response(
+                status_code=401,
+                headers={"WWW-Authenticate": "Basic"},
+                content="Unauthorized"
+            )
+
     try:
-        response: Response = await call_next(request)
+        response = await call_next(request)
     except Exception as e:
         response = JSONResponse({"error": str(e)}, status_code=500)
 
